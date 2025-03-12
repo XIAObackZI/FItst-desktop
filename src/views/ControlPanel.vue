@@ -124,13 +124,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { VueDraggableNext as draggable } from 'vue-draggable-next';
+import { VueDraggableNext } from 'vue-draggable-next';
 import ModuleCard from '../components/ControlPanel/ModuleCard.vue';
 import ThemeSwitcher from '../components/ControlPanel/ThemeSwitcher.vue';
 import SortControls from '../components/ControlPanel/SortControls.vue';
 import themeStore from '../store/theme';
 import moduleStore, { ModuleType } from '../store/moduleStore';
 import { Fold, Expand, Rank } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 
 // 侧边栏收缩状态
 const isCollapsed = ref(false);
@@ -228,6 +229,9 @@ onMounted(() => {
     isCollapsed.value = savedCollapsedState === 'true';
   }
 });
+
+// 正确注册draggable组件
+const draggable = VueDraggableNext;
 </script>
 
 <style scoped>

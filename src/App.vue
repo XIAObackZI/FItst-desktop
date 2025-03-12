@@ -1,11 +1,30 @@
 <script setup lang="ts">
 // App.vue主文件，使用router-view显示路由组件
-import { onMounted } from 'vue';
+import { onMounted, provide, onBeforeUnmount } from 'vue';
 import themeStore from './store/theme';
+
+// 提供主题store给所有子组件
+provide('themeStore', themeStore);
 
 // 初始化主题
 onMounted(() => {
-  themeStore.setTheme(themeStore.theme);
+  // 应用保存的主题设置
+  const savedTheme = localStorage.getItem('theme') || 'system';
+  themeStore.setTheme(savedTheme);
+  
+  // 添加路由变化监听，确保在页面切换时主题保持一致
+  const applyThemeOnNavigation = () => {
+    themeStore.applyTheme();
+    console.log('路由变化，重新应用主题:', themeStore.theme);
+  };
+  
+  // 监听路由变化事件
+  window.addEventListener('popstate', applyThemeOnNavigation);
+  
+  // 清理函数
+  onBeforeUnmount(() => {
+    window.removeEventListener('popstate', applyThemeOnNavigation);
+  });
 });
 </script>
 

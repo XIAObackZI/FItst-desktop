@@ -3,8 +3,8 @@
     <el-dropdown trigger="click" @command="handleThemeChange">
       <div class="theme-icon">
         <transition name="theme-icon-rotate" mode="out-in">
-          <el-icon v-if="themeStore.actualTheme === 'light'" key="light"><Sunny /></el-icon>
-          <el-icon v-else-if="themeStore.actualTheme === 'dark'" key="dark"><Moon /></el-icon>
+          <el-icon v-if="currentThemeIcon === 'light'" key="light"><Sunny /></el-icon>
+          <el-icon v-else-if="currentThemeIcon === 'dark'" key="dark"><Moon /></el-icon>
           <el-icon v-else key="system"><Monitor /></el-icon>
         </transition>
       </div>
@@ -38,24 +38,57 @@ const isDarkMode = computed(() => {
   return themeStore.actualTheme === 'dark';
 });
 
-// 监视主题变化以便在控制台记录
+// 使用计算属性确定当前应该显示的图标
+const currentThemeIcon = computed(() => {
+  if (themeStore.theme === 'system') {
+    return 'system'; // 如果是系统模式，显示电脑图标
+  } else {
+    return themeStore.actualTheme; // 否则根据实际应用的主题显示太阳或月亮
+  }
+});
+
+// 调试用：监视主题变化以便在控制台记录
 watch(() => themeStore.actualTheme, (newTheme) => {
   console.log('当前实际主题:', newTheme);
+  forceRerender();
 });
 
 // 监视选择的主题模式
 watch(() => themeStore.theme, (newTheme) => {
   console.log('当前选择的主题模式:', newTheme);
+  forceRerender();
 });
 
+// 处理主题变更命令
 const handleThemeChange = (command: string) => {
   themeStore.setTheme(command as ThemeType);
+};
+
+// 强制组件重新渲染的辅助函数
+const forceRerender = () => {
+  setTimeout(() => {
+    // 延迟执行，确保DOM已更新
+    const icon = document.querySelector('.theme-icon');
+    if (icon) {
+      icon.classList.add('force-rerender');
+      setTimeout(() => {
+        icon.classList.remove('force-rerender');
+      }, 50);
+    }
+  }, 0);
 };
 
 // 组件挂载时重新应用主题，确保图标正确显示
 onMounted(() => {
   // 强制刷新主题以确保图标正确
-  themeStore.setTheme(themeStore.theme);
+  themeStore.enforceTheme();
+  // 添加页面可见性变化监听，确保切换回页面时图标正确
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      themeStore.enforceTheme();
+      forceRerender();
+    }
+  });
 });
 </script>
 
@@ -81,6 +114,16 @@ onMounted(() => {
 
 .theme-icon:hover {
   background-color: var(--color-hover);
+}
+
+.force-rerender {
+  animation: blink 0.1s;
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
 }
 
 :deep(.el-dropdown-menu__item.active) {
