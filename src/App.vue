@@ -1,35 +1,48 @@
 <script setup lang="ts">
 // App.vue主文件，使用router-view显示路由组件
-import { onMounted, provide, onBeforeUnmount } from 'vue';
+import { onMounted, onBeforeUnmount, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import themeStore from './store/theme';
 
-// 提供主题store给所有子组件
-provide('themeStore', themeStore);
+const route = useRoute();
 
 // 初始化主题
 onMounted(() => {
-  // 应用保存的主题设置
-  const savedTheme = localStorage.getItem('theme') || 'system';
-  themeStore.setTheme(savedTheme);
+  // 使用.value获取Ref的值
+  themeStore.setTheme(themeStore.theme.value);
   
-  // 添加路由变化监听，确保在页面切换时主题保持一致
-  const applyThemeOnNavigation = () => {
-    themeStore.applyTheme();
-    console.log('路由变化，重新应用主题:', themeStore.theme);
-  };
-  
-  // 监听路由变化事件
-  window.addEventListener('popstate', applyThemeOnNavigation);
-  
-  // 清理函数
-  onBeforeUnmount(() => {
-    window.removeEventListener('popstate', applyThemeOnNavigation);
-  });
+  // 应用保存的主题
+  applyStoredTheme();
 });
+
+// 监听路由变化重新应用主题，确保在页面切换后保持主题一致
+watch(() => route.path, () => {
+  applyStoredTheme();
+});
+
+// 应用保存的主题
+const applyStoredTheme = () => {
+  const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system';
+  if (savedTheme) {
+    themeStore.setTheme(savedTheme);
+  }
+  
+  // 确保主题类被正确应用
+  if (themeStore.actualTheme.value === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+};
 </script>
 
 <template>
-  <router-view />
+  <!-- 添加全局路由过渡动画 -->
+  <router-view v-slot="{ Component }">
+    <transition name="page-transition" mode="out-in">
+      <component :is="Component" />
+    </transition>
+  </router-view>
 </template>
 
 <style>
@@ -78,6 +91,8 @@ onMounted(() => {
 html {
   transition: background-color var(--transition-theme),
               color var(--transition-theme);
+  margin: 0;
+  padding: 0;
 }
 
 /* 应用过渡效果的元素 */
@@ -114,11 +129,18 @@ h1, h2, h3, p, div,
 body {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
   overflow: hidden;
   color: var(--color-text);
   background-color: var(--color-background);
   transition: background-color var(--transition-theme),
               color var(--transition-theme);
+}
+
+/* 修复容器边距 */
+.el-container {
+  margin: 0;
+  padding: 0;
 }
 
 /* Element Plus 主题覆盖 */
@@ -171,5 +193,21 @@ body {
 
 .theme-icon-rotate-leave-to {
   transform: rotate(90deg);
+}
+
+/* 页面路由过渡动画 */
+.page-transition-enter-active,
+.page-transition-leave-active {
+  transition: opacity 0.3s ease, transform 0.4s ease;
+}
+
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
 }
 </style>

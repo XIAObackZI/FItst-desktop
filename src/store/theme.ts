@@ -31,22 +31,6 @@ export const useThemeStore = () => {
     console.log('主题已应用:', {theme: theme.value, actualTheme: actualTheme.value, isDark: prefersDark.matches});
   };
 
-  // 确保主题应用在所有页面
-  const enforceTheme = () => {
-    const currentTheme = localStorage.getItem('theme') as ThemeType || 'system';
-    if (theme.value !== currentTheme) {
-      theme.value = currentTheme;
-    }
-    
-    if (theme.value === 'system') {
-      actualTheme.value = prefersDark.matches ? 'dark' : 'light';
-    } else {
-      actualTheme.value = theme.value;
-    }
-    
-    applyTheme();
-  };
-
   // 监听主题变化
   watch(actualTheme, () => {
     applyTheme();
@@ -73,9 +57,6 @@ export const useThemeStore = () => {
     } else {
       actualTheme.value = newTheme;
     }
-    
-    // 立即应用并保存
-    applyTheme();
   };
 
   // 切换暗黑/亮色主题
@@ -87,16 +68,11 @@ export const useThemeStore = () => {
     }
   };
 
-  // 初始时应用一次
-  applyTheme();
-
   return {
     theme,
     actualTheme,
     setTheme,
-    toggleDarkMode,
-    applyTheme,
-    enforceTheme
+    toggleDarkMode
   };
 };
 

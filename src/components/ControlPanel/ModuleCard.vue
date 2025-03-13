@@ -4,6 +4,8 @@
     shadow="hover" 
     :body-style="{ padding: '0px' }"
     @click="handleCardClick"
+    :class="{ 'draggable': draggable }"
+    :data-id="id"
   >
     <div class="card-content">
       <div class="icon-container" :style="{ backgroundColor: iconBgColor }">
@@ -27,6 +29,9 @@
         <h3>{{ title }}</h3>
         <p>{{ description }}</p>
       </div>
+      <div v-if="draggable" class="drag-handle">
+        <el-icon><ArrowLeft /></el-icon>
+      </div>
     </div>
   </el-card>
 </template>
@@ -36,8 +41,13 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import themeStore from '../../store/theme';
 import CustomIcon from './CustomIcon.vue';
+import { ArrowLeft } from '@element-plus/icons-vue';
 
 const props = defineProps({
+  id: {
+    type: String,
+    default: () => `card-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  },
   title: {
     type: String,
     required: true
@@ -65,6 +75,10 @@ const props = defineProps({
   customIconName: {
     type: String,
     default: ''
+  },
+  draggable: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -79,6 +93,11 @@ const iconColor = computed(() => {
 });
 
 const handleCardClick = () => {
+  if (props.draggable) {
+    // 在拖拽模式下，点击不执行路由导航
+    return;
+  }
+  
   if (props.route) {
     router.push(props.route);
   }
@@ -95,12 +114,18 @@ const handleCardClick = () => {
   border-radius: 8px;
   box-shadow: var(--shadow-card);
   border: 1px solid var(--color-border-light);
+  position: relative;
 }
 
 .module-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   border-color: var(--color-primary);
+}
+
+.module-card.draggable {
+  cursor: move;
+  border: 2px dashed var(--color-primary);
 }
 
 .card-content {
@@ -138,6 +163,46 @@ const handleCardClick = () => {
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--color-primary);
+  animation: pulse 2s infinite;
+  cursor: grab;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.drag-handle:hover {
+  transform: scale(1.2);
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
 }
 
 h3 {

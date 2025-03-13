@@ -1,153 +1,169 @@
 <template>
   <div class="sort-controls">
-    <el-dropdown trigger="click" @command="handleSortChange">
-      <div class="sort-button">
-        <el-button type="primary" size="small">
-          {{ currentSortLabel }}
-          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-        </el-button>
-      </div>
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item :class="{ active: sortType === 'custom' }" command="custom">
-            <el-icon><Rank /></el-icon>
-            <span>自定义排序</span>
-          </el-dropdown-item>
-          <el-dropdown-item :class="{ active: sortType === 'name' }" command="name">
-            <el-icon><SortUp /></el-icon>
-            <span>按名称排序</span>
-          </el-dropdown-item>
-          <el-dropdown-item :class="{ active: sortType === 'lastAccessed' }" command="lastAccessed">
-            <el-icon><Timer /></el-icon>
-            <span>按最近使用排序</span>
-          </el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
-    
-    <div v-if="sortType === 'custom' && showDragTip" class="drag-tip">
-      <el-alert
-        title="提示：可拖拽卡片调整顺序"
-        type="info"
-        :closable="true"
-        @close="closeTip"
-        show-icon
-        center
-        effect="light"
-      />
-    </div>
-    
-    <el-tooltip 
-      v-if="sortType === 'custom'" 
-      content="进入编辑模式调整顺序" 
-      placement="top" 
-      effect="light"
-    >
+    <SegmentedControl
+      v-model="localSortMode"
+      @change="handleSortModeChange"
+      :options="sortOptions"
+      class="sort-mode-selector"
+    />
+    <div v-if="sortMode === 'custom'" class="custom-sort-controls">
       <el-button 
+        type="primary" 
         size="small" 
-        class="edit-button" 
-        :type="isEditMode ? 'success' : 'info'"
+        :plain="!isEditMode" 
         @click="toggleEditMode"
+        class="edit-button"
       >
-        <el-icon><EditPen /></el-icon>
+        <el-icon class="edit-icon"><component :is="isEditMode ? 'Check' : 'Edit'" /></el-icon>
+        {{ isEditMode ? '完成编辑' : '编辑排序' }}
       </el-button>
-    </el-tooltip>
+      <div v-if="isEditMode" class="edit-tip">
+        <el-icon><ArrowDown /></el-icon>
+        拖拽卡片进行排序
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { ArrowDown, Rank, SortUp, Timer, EditPen } from '@element-plus/icons-vue';
-import moduleStore, { SortType } from '../../store/moduleStore';
+import { ref, watch } from 'vue';
+import { Edit, Check, ArrowDown } from '@element-plus/icons-vue';
+import SegmentedControl from './SegmentedControl.vue';
 
-// Props and emits
-const emit = defineEmits(['update:editMode']);
+// 定义排序模式类型
+export type SortMode = 'name' | 'recent' | 'custom';
+
+// 接收父组件传入的props
 const props = defineProps({
-  editMode: {
+  sortMode: {
+    type: String as () => SortMode,
+    default: 'name'
+  },
+  isEditMode: {
     type: Boolean,
     default: false
   }
 });
 
-// Local state
-const showDragTip = ref(localStorage.getItem('hideDragTip') !== 'true');
-
-// 当前排序类型
-const sortType = computed(() => moduleStore.sortType);
-
-// 当前排序标签
-const currentSortLabel = computed(() => {
-  switch (sortType.value) {
-    case 'name':
-      return '按名称排序';
-    case 'lastAccessed':
-      return '按最近使用排序';
-    case 'custom':
-    default:
-      return '自定义排序';
+// 定义排序选项
+const sortOptions = [
+  {
+    value: 'name',
+    label: '按名称',
+    icon: 'SortUp'
+  },
+  {
+    value: 'recent',
+    label: '最近使用',
+    icon: 'Timer'
+  },
+  {
+    value: 'custom',
+    label: '自定义',
+    icon: 'DragMove'
   }
+];
+
+// 创建本地状态以避免直接修改props
+const localSortMode = ref(props.sortMode);
+
+// 监听props变化并更新本地状态
+watch(() => props.sortMode, (newValue) => {
+  localSortMode.value = newValue;
 });
 
-// 处理排序变化
-const handleSortChange = (command: string) => {
-  moduleStore.setSortType(command as SortType);
-  
-  // 如果切换到自定义排序且从未关闭过提示，则显示提示
-  if (command === 'custom' && localStorage.getItem('hideDragTip') !== 'true') {
-    showDragTip.value = true;
-  }
-  
-  // 如果不是自定义排序，退出编辑模式
-  if (command !== 'custom' && props.editMode) {
-    emit('update:editMode', false);
-  }
-};
+// 定义要暴露给父组件的事件
+const emits = defineEmits(['update:sortMode', 'update:isEditMode']);
 
-// 关闭拖拽提示
-const closeTip = () => {
-  showDragTip.value = false;
-  localStorage.setItem('hideDragTip', 'true');
+// 处理排序模式变化
+const handleSortModeChange = (value: SortMode) => {
+  emits('update:sortMode', value);
+  // 如果切换到非自定义排序模式，自动退出编辑模式
+  if (value !== 'custom' && props.isEditMode) {
+    emits('update:isEditMode', false);
+  }
 };
 
 // 切换编辑模式
 const toggleEditMode = () => {
-  emit('update:editMode', !props.editMode);
+  emits('update:isEditMode', !props.isEditMode);
 };
-
-// 计算编辑按钮状态
-const isEditMode = computed(() => props.editMode);
 </script>
 
 <style scoped>
 .sort-controls {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  background-color: var(--color-card-background);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s ease;
+  position: sticky;
+  top: 10px;
+  z-index: 10;
+  backdrop-filter: blur(5px);
+}
+
+.sort-mode-selector {
+  display: flex;
+  align-items: center;
+}
+
+.custom-sort-controls {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sort-button {
-  display: flex;
-  align-items: center;
-}
-
-.drag-tip {
-  flex: 1;
-  max-width: 300px;
-}
-
-:deep(.el-dropdown-menu__item.active) {
-  color: var(--el-color-primary);
-  background-color: rgba(var(--el-color-primary-rgb), 0.1);
-}
-
-:deep(.el-dropdown-menu__item) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .edit-button {
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.edit-button:hover {
+  transform: translateY(-2px);
+}
+
+.edit-icon {
+  transition: transform 0.3s ease;
+}
+
+.edit-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+  font-size: 14px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .sort-controls {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .sort-mode-selector, .custom-sort-controls {
+    width: 100%;
+  }
 }
 </style> 

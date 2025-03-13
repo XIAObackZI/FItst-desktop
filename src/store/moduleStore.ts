@@ -15,8 +15,8 @@ export type ModuleType = {
   lastAccessed?: number; // 上次访问时间
 };
 
-// 排序类型
-export type SortType = 'custom' | 'name' | 'lastAccessed';
+// 排序模式类型
+export type SortMode = 'name' | 'recent' | 'custom';
 
 // 模块状态管理
 export const useModuleStore = () => {
@@ -138,6 +138,19 @@ export const useModuleStore = () => {
       color: '#909399',
       order: 8,
       lastAccessed: Date.now() - 691200000 // 八天前
+    },
+    {
+      id: 'wechat-auto',
+      name: '微信自动化',
+      description: '微信消息自动化处理工具',
+      icon: 'ChatDotRound',
+      customIconName: '',
+      useCustomIcon: false,
+      route: '/wechat-auto',
+      category: 'tools',
+      color: '#07C160', // 微信绿色
+      order: 9,
+      lastAccessed: Date.now() - 777600000 // 九天前
     }
   ];
 
@@ -146,48 +159,115 @@ export const useModuleStore = () => {
     try {
       const savedModules = localStorage.getItem('modules');
       if (savedModules) {
-        return JSON.parse(savedModules);
+        // 确保加载的模块有有效的数据
+        const parsedModules = JSON.parse(savedModules) as ModuleType[];
+        // 验证modules数据结构完整性
+        if (Array.isArray(parsedModules) && parsedModules.length > 0) {
+          console.log('成功从本地存储加载模块数据:', parsedModules.length, '个模块');
+          
+          // 检查是否有新增模块
+          const moduleIds = parsedModules.map(m => m.id);
+          const newModules = defaultModules.filter(m => !moduleIds.includes(m.id));
+          
+          if (newModules.length > 0) {
+            console.log('发现新增模块:', newModules.length, '个，将合并到现有模块中');
+            return [...parsedModules, ...newModules];
+          }
+          
+          // 确保每个模块都有order属性
+          const modulesWithOrder = parsedModules.map((module, index) => {
+            if (module.order === undefined) {
+              return { ...module, order: index };
+            }
+            return module;
+          });
+          
+          return modulesWithOrder;
+        } else {
+          console.warn('本地存储中的模块数据无效，使用默认模块');
+        }
+      } else {
+        console.log('本地存储中没有模块数据，使用默认模块');
       }
     } catch (error) {
       console.error('加载模块数据失败:', error);
     }
-    return defaultModules;
+    
+    // 为默认模块添加order属性
+    return defaultModules.map((module, index) => {
+      if (module.order === undefined) {
+        return { ...module, order: index };
+      }
+      return module;
+    });
   };
 
   // 模块列表
   const modules = ref<ModuleType[]>(loadModulesFromStorage());
   
-  // 当前排序类型
-  const sortType = ref<SortType>(localStorage.getItem('sortType') as SortType || 'custom');
+  // 当前排序模式
+  const sortMode = ref<SortMode>(localStorage.getItem('sortMode') as SortMode || 'name');
 
   // 保存模块到本地存储
   const saveModules = () => {
-    localStorage.setItem('modules', JSON.stringify(modules.value));
-    localStorage.setItem('sortType', sortType.value);
+    try {
+      const modulesString = JSON.stringify(modules.value);
+      localStorage.setItem('modules', modulesString);
+      console.log('模块数据已保存到本地存储:', modules.value.length, '个模块');
+    } catch (error) {
+      console.error('保存模块数据失败:', error);
+    }
+  };
+  
+  // 保存排序模式
+  const saveSortMode = () => {
+    localStorage.setItem('sortMode', sortMode.value);
   };
 
   // 监听模块变化，保存到本地存储
   watch(modules, () => {
     saveModules();
   }, { deep: true });
-
-  // 监听排序类型变化
-  watch(sortType, () => {
-    localStorage.setItem('sortType', sortType.value);
+  
+  // 监听排序模式变化，保存到本地存储
+  watch(sortMode, () => {
+    saveSortMode();
   });
 
-  // 排序后的模块列表
+  // 按名称排序的模块列表
+  const modulesSortedByName = computed(() => {
+    return [...modules.value].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  
+  // 按最近使用排序的模块列表
+  const modulesSortedByRecent = computed(() => {
+    return [...modules.value].sort((a, b) => {
+      const aTime = a.lastAccessed || 0;
+      const bTime = b.lastAccessed || 0;
+      return bTime - aTime; // 降序排列
+    });
+  });
+  
+  // 按自定义顺序排序的模块列表
+  const modulesSortedByCustom = computed(() => {
+    return [...modules.value].sort((a, b) => {
+      const aOrder = a.order !== undefined ? a.order : 999;
+      const bOrder = b.order !== undefined ? b.order : 999;
+      return aOrder - bOrder;
+    });
+  });
+  
+  // 根据当前排序模式获取排序后的模块列表
   const sortedModules = computed(() => {
-    const clonedModules = [...modules.value];
-    
-    switch (sortType.value) {
+    switch (sortMode.value) {
       case 'name':
-        return clonedModules.sort((a, b) => a.name.localeCompare(b.name));
-      case 'lastAccessed':
-        return clonedModules.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+        return modulesSortedByName.value;
+      case 'recent':
+        return modulesSortedByRecent.value;
       case 'custom':
+        return modulesSortedByCustom.value;
       default:
-        return clonedModules.sort((a, b) => (a.order || 0) - (b.order || 0));
+        return modulesSortedByName.value;
     }
   });
 
@@ -210,50 +290,31 @@ export const useModuleStore = () => {
       saveModules();
     }
   };
-
-  // 更改模块排序
-  const updateModuleOrder = (moduleId: string, newOrder: number) => {
-    const moduleIndex = modules.value.findIndex(m => m.id === moduleId);
-    if (moduleIndex !== -1) {
-      modules.value[moduleIndex] = {
-        ...modules.value[moduleIndex],
-        order: newOrder
-      };
-      saveModules();
-    }
-  };
-
-  // 设置排序类型
-  const setSortType = (type: SortType) => {
-    sortType.value = type;
-  };
-
-  // 更新模块自定义顺序（拖拽排序后）
+  
+  // 更新模块顺序
   const updateModulesOrder = (newOrder: ModuleType[]) => {
     // 更新每个模块的order属性
-    newOrder.forEach((module, index) => {
-      const existingModule = modules.value.find(m => m.id === module.id);
-      if (existingModule) {
-        existingModule.order = index;
-      }
-    });
-    
-    // 设置排序类型为自定义
-    sortType.value = 'custom';
-    
-    // 保存到本地存储
+    modules.value = newOrder.map((module, index) => ({
+      ...module,
+      order: index
+    }));
     saveModules();
+  };
+  
+  // 设置排序模式
+  const setSortMode = (mode: SortMode) => {
+    sortMode.value = mode;
+    saveSortMode();
   };
 
   return {
     modules,
+    sortMode,
     sortedModules,
-    sortType,
     getModulesByCategory,
     updateModuleAccessTime,
-    updateModuleOrder,
-    setSortType,
-    updateModulesOrder
+    updateModulesOrder,
+    setSortMode
   };
 };
 
